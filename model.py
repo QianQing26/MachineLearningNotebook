@@ -225,3 +225,106 @@ class KNN:
             y_pred[i] = testlabel
         
         return y_pred
+
+
+import numpy as np
+
+class KMeans:
+    # 调用train方法进行训练
+    def __init__(self, data, num_clusters):
+        self.data = data
+        self.num_clusters = num_clusters
+
+    def train(self, num_iters):
+        # 1.随机选择质心
+        centroids = self.centroids_init(self.data, self.num_clusters)
+        # 2.开始训练
+        num_samples = self.data.shape[0]
+        closest_centroids_ids = np.empty((num_samples,1))
+        for _ in range(num_iters):
+            # 3.样本点归属划分
+            closest_centroids_ids = self.find_closest(self.data, centroids)
+            # 4.中心点迭代过程
+            centroids = self.centroids_compute(self.data, closest_centroids_ids, self.num_clusters)
+        return centroids,closest_centroids_ids
+    
+    def centroids_init(self,data, num_clusters):
+        num_samples = data.shape[0]
+        randomID = np.random.permutation(num_samples)
+        cenrtroids = data[randomID[:num_clusters],:]
+        return cenrtroids
+
+    def find_closest(self,data,centroids):
+        closest_ids = []
+        for sample in data:
+            distances = []
+            for cen in centroids:
+                dis = sample - cen
+                dis = dis*dis
+                dis = np.sum(dis)
+                dis = np.sqrt(dis)
+                distances.append(dis)
+            closest_ids.append(distances.index(min(distances)))
+        closest_centroids_ids = np.array(closest_ids)
+        return closest_centroids_ids
+    
+    def centroids_compute(self,data,closest_centroids_ids, num_clusters):
+        # 4,5'
+        num_features = data.shape[1]
+        centroids = np.zeros((num_clusters,num_features))
+        for centroids_id in range(num_clusters):
+            points = data[closest_centroids_ids==centroids_id]
+            centroids[centroids_id] = np.mean(points,axis=0)
+        return centroids
+    
+
+class DBSCAN:
+    # 调用fit方法进行训练
+    def __init__(self, eps, min_samples):
+        self.eps = eps                      # 邻域半径参数
+        self.min_samples = min_samples      # 密度参数
+        self.labels = None                  
+    
+    def distance(self, xa, xb):
+        # 计算两点的欧氏距离
+        return np.sqrt(np.sum((xa - xb) ** 2))
+    
+    def region_query(self, X, point_idx):
+        # 找到邻域内的点的索引
+        neighbors = []
+        for i in range(len(X)):
+            if self.distance(X[point_idx], X[i]) <= self.eps:
+                neighbors.append(i)
+        return neighbors
+    
+    def expand_cluster(self, X, cluster_id, point_idx, neighbors):
+        # 根据给定点及其邻域进行拓展
+        self.labels[point_idx] = cluster_id
+        i = 0
+        while i < len(neighbors):
+            neighbor = neighbors[i]
+            if self.labels[neighbor] == -1:
+                self.labels[neighbor] = cluster_id
+            elif self.labels[neighbor] == 0:
+                self.labels[neighbor] = cluster_id
+                point_neighbors = self.region_query(X, neighbor)
+                if len(point_neighbors) >= self.min_samples:
+                    neighbors += point_neighbors
+            i += 1
+    
+    def fit(self, X):
+        # 训练
+        n = len(X)
+        self.labels = np.zeros(n)
+        cluster_id = 1
+        for i in range(n):
+            if self.labels[i] != 0:
+                continue
+            neighbors = self.region_query(X, i)
+            if len(neighbors) < self.min_samples:
+                self.labels[i] = -1
+            else:
+                self.expand_cluster(X, cluster_id, i, neighbors)
+                cluster_id += 1
+        # 返回聚类标签
+        return self.labels
