@@ -328,3 +328,68 @@ class DBSCAN:
                 cluster_id += 1
         # 返回聚类标签
         return self.labels
+    
+
+
+class DecisionNode:
+    def __init__(self, feature_index=None, threshold=None, 
+                 value=None, left=None, right=None):
+        self.feature_index = feature_index   # 特征索引
+        self.threshold = threshold           # 分割阈值
+        self.value = value                   # 结点值
+        self.left = left                     # 左子结点
+        self.right = right                   # 右子结点
+
+class DecisionTreeClassifier:
+    def __init__(self, max_depth=None):
+        self.max_depth = max_depth
+        self.tree = None
+
+    def _gini_index(self, y):
+        classes = np.unique(y)
+        gini = 0.0
+        for cls in classes:
+            p = np.sum(y == cls) / len(y)
+            gini += p * (1 - p)
+        return gini
+    
+    def _best_split(self, X, y):
+        best_gini = float('inf')
+        best_feature_index = 0
+        best_threshold = 0
+        for feature_index in range(X.shape[1]):
+            for threshold in np.unique(X[:, feature_index]):
+                left_mask = X[:, feature_index] <= threshold
+                right_mask = X[:, feature_index] > threshold
+                gini = (len(y[left_mask]) * self._gini_index(y[left_mask])
+                        + len(y[right_mask]) * self._gini_index(y[right_mask])) / len(y)
+                if gini < best_gini:
+                    best_gini = gini
+                    best_feature_index = feature_index
+                    best_threshold = threshold
+        return best_feature_index, best_threshold
+    
+    def _build_tree(self, X, y, depth):
+        if depth == self.max_depth or len(np.unique(y)) == 1:
+            return DecisionNode(value=np.argmax(np.bincount(y)))
+        feature_index, threshold = self._best_split(X, y)
+        left_mask = X[:, feature_index] <= threshold
+        right_mask = X[:, feature_index] > threshold
+        left = self._build_tree(X[left_mask], y[left_mask], depth + 1)
+        right = self._build_tree(X[right_mask], y[right_mask], depth + 1)
+        return DecisionNode(feature_index, threshold, left=left, right=right)
+    
+    def fit(self, X, y):
+        self.tree = self._build_tree(X, y, 0)
+        
+    def predict(self, X):
+        results = []
+        for sample in X:
+            node = self.tree
+            while node.left:
+                if sample[node.feature_index] <= node.threshold:
+                    node = node.left
+                else:
+                    node = node.right
+            results.append(node.value)
+        return results
